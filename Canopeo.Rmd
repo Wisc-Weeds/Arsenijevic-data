@@ -1,0 +1,241 @@
+---
+title: "Canopeo"
+author: "Maxwel Coura Oliveira"
+date: "10/2/2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(drc)
+library(ggplot2)
+library(lubridate)
+library(tidyverse)
+library(hrbrthemes)
+library(plotly)
+library(patchwork)
+library(babynames)
+library(viridis)
+library(lme4)
+library(nlme)
+library(lmerTest)
+library(emmeans)
+library(car)
+library(agricolae)
+library(multcomp)
+library(multcompView)
+library(lattice)
+library(ggpubr)
+```
+
+
+```{r}
+data <- read_csv("Canopeo.csv")
+data$treatment <- as.factor(data$treatment)
+glimpse(data)
+
+ggplot(data, aes(x=doy, y=cavg, fill=treatment, color=treatment)) + geom_point()
+
+```
+
+
+# 4 parameter log-logistic \\ 
+
+
+```{r, warning=FALSE}
+model <- drm(cavg ~ doy, treatment, fct=l4(fixed = c(NA,NA,NA,NA), names = c("slope", "lower", "upper", "ec50")), data=data)
+summary(model)
+```
+
+
+```{r, warning =FALSE}
+plot(model)
+```
+
+```{r}
+ed_ninety <- ED(model, c(90), type = "absolute")
+summary(ed_ninety)
+ed_fifty <- ED(model, c(90), type = "absolute")
+ed_ten <- ED(model, c(10), type = "absolute")
+```
+
+```{r}
+EDcomp(model, c(50,50), type="absolute")
+```
+
+
+
+# 3 parameter log-logistic
+
+```{r, warning=FALSE}
+model2 <- drm(cavg ~ doy, treatment, fct=l3(fixed = c(NA,NA,NA), names = c("slope", "upper", "ec50")), data=data)
+summary(model2)
+```
+
+
+
+
+
+
+# 3 parameter Weibull
+
+```{r, warning=FALSE}
+model3 <- drm(cavg ~ doy, treatment, data = data, fct=W2.3(fixed = c(NA,NA,NA), names = c("slope", "upper", "ec50")))
+summary(model3)
+plot(model3)
+abline(h=90, col="blue")
+
+wei10 <- ED(model3, c(10), type = "absolute", interval = "delta")
+wei50 <- ED(model3, c(50), type = "absolute", interval = "delta")
+wei90 <- ED(model3, c(90), type = "absolute", interval = "delta")
+
+as.dataframe = wei10
+
+plot(Estimate~Lower, data = wei10)
+plot(Estimate~Lower, data = wei50)
+plot(Estimate~Lower, data = wei90)
+```
+```{r}
+
+```
+
+```{r}
+plot(Estimate~Lower, data = wei50)
+```
+
+
+```{r}
+plot(model3, legendPos = c(0, 95))
+```
+
+
+
+
+
+
+
+```{r eval=FALSE, include=FALSE}
+
+#plot(model3, xlab = "Day of the Year", xlim = c(125, 210), ylim = c(0, 100), ylab = "Average Canopy Cover (%)", legend("topleft", c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16"))
+
+
+
+#legend("topleft", legend=c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16"), col=treatment, lty=1:2, cex=0.8)))
+```
+
+
+
+```{r}
+plot(model3, type="bars", ylim = c(0,15))
+```
+
+
+
+
+
+```{r}
+nnames <- c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16");
+```
+
+```{r, warning=FALSE}
+plot(model3, legend = TRUE, legendPos = c(140, 110), legendText = c("t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16"), col=data$treatment, ylim=c(0, 150))
+
+```
+
+```{r}
+#new dose levels as support for the line
+#newdata <- expand.grid(cavg=exp(seq(log(0.5), log(100), length=100)))
+#predictions and confidence intervals
+#pm <- predict(model3, newdata=newdata, interval="confidence")
+#newdata$p <- pm[,1]
+#$pmin <- pm[,2]
+#newdata$pmax <- pm[,3]
+
+#data$cavg <- data$cavg
+#data$cavg[data$cavg == 0] <- 0.5
+
+#ggplot(data, aes(x = doy, y = cavg)) +
+#geom_point() +
+#geom_ribbon(data=newdata, aes(x=cavg, y=p, ymin=pmin, ymax=pmax), alpha=0.2) +
+#geom_line(data=newdata, aes(x=cavg, y=p)) +
+#coord_trans(x="log") +
+#xlab("Average Canopy Cover") + ylab("Day of the Year")
+```
+
+```{r, warning=FALSE, COMPARISON}
+ED(model3, c(10, 50, 95), type="absolute")
+EDcomp(model3, c(50,50), type="absolute")
+EDcomp(model3, c(50,50), type="absolute")
+compParm(model3, "upper", "-", display=TRUE)
+```
+
+```{r new data loading}
+ed10 <- read_csv("ed1001.csv")
+
+glimpse(ed10)
+ed50 <- read_csv("ed50.csv")
+ed90 <- read_csv("ed90.csv")
+```
+
+
+
+
+```{r ggplot ed10}
+ed10$trt <- factor(ed10$trt)
+f10 <- ggplot(ed10, aes(x = trt, y=Estimate, color=trt), inherit.aes=TRUE) + 
+  geom_point (size = 4, shape = 15) + 
+  geom_errorbar(aes(ymin  =  lower.CL, ymax  =  upper.CL), width =  0.2, size  =  0.7) +
+  theme_bw() + theme(axis.title   = element_text(face = "bold"), 
+                     axis.text = element_text(face = "bold"), 
+                     plot.caption = element_text(hjust = 0)) + ylim(150, 208) +
+  ylab("Day of the Year") + coord_flip()
+f10
+```
+
+```{r ggplot ed50}
+ed50$trt <- factor(ed50$trt)
+
+f50 <- ggplot(ed50, aes(x = trt, y=Estimate, color=trt), inherit.aes=TRUE) + 
+  geom_point (size = 4, shape = 15) + 
+  geom_errorbar(aes(ymin  =  lower.CL, ymax  =  upper.CL), width =  0.2, size  =  0.7) +
+  theme_bw() + theme(axis.title   = element_text(face = "bold"), 
+                     axis.text = element_text(face = "bold"), 
+                     plot.caption = element_text(hjust = 0)) + ylim(150, 208) +
+  ylab("Day of the Year") + coord_flip()
+f50
+```
+
+
+```{r ggplot ed90}
+ed90$trt <- factor(ed90$trt)
+
+f90 <- ggplot(ed90, aes(x = trt, y=Estimate, label=".", colour = trt), inherit.aes=TRUE) + 
+  geom_point (size = 4, shape = 15) + 
+  geom_errorbar(aes(ymin  =  lower.CL, ymax  =  upper.CL), width =  0.2, size  =  0.7) +
+  theme_bw() + theme(axis.title   = element_text(face = "bold"), 
+                     axis.text = element_text(face = "bold"), 
+                     plot.caption = element_text(hjust = 0)) + ylim(150, 208) + coord_flip()
+f90
+```
+
+
+
+
+```{r ggplot merge, eval=FALSE, include=FALSE}
+if(!require(devtools)) install.packages("devtools")
+devtools::install_github("kassambara/ggpubr")
+
+install.packages("ggpubr")
+library(ggpubr)
+```
+
+```{r}
+finalfigure <- ggarrange(f10, f50, f90, labels = c("ED10", "ED50", "ED90"), legend = "bottom", label.x = 0.1, label.y = 1.00005, ncol = 3, nrow = 1)
+
+finalfigure
+```
+
+
+
